@@ -144,7 +144,11 @@ cdef class PureMarketMakingStrategy(StrategyBase):
         self._last_own_trade_price = Decimal('nan')
         self._should_wait_order_cancel_confirmation = should_wait_order_cancel_confirmation
         self._moving_price_band = moving_price_band
+
+        self._absolute_spread = True # TODO add to config
+
         self.c_add_markets([market_info.market])
+
 
     def all_markets_ready(self):
         return all([market.ready for market in self._sb_markets])
@@ -803,7 +807,10 @@ cdef class PureMarketMakingStrategy(StrategyBase):
         else:
             if not buy_reference_price.is_nan():
                 for level in range(0, self._buy_levels):
-                    price = buy_reference_price * (Decimal("1") - self._bid_spread - (level * self._order_level_spread))
+                    if self._absolute_spread:
+                        price = buy_reference_price - level * self._absolute_spread
+                    else:
+                        price = buy_reference_price * (Decimal("1") - self._bid_spread - (level * self._order_level_spread))
                     price = market.c_quantize_order_price(self.trading_pair, price)
                     size = self._order_amount + (self._order_level_amount * level)
                     size = market.c_quantize_order_amount(self.trading_pair, size)
@@ -811,7 +818,10 @@ cdef class PureMarketMakingStrategy(StrategyBase):
                         buys.append(PriceSize(price, size))
             if not sell_reference_price.is_nan():
                 for level in range(0, self._sell_levels):
-                    price = sell_reference_price * (Decimal("1") + self._ask_spread + (level * self._order_level_spread))
+                    if self._absolute_spread:
+                        price = sell_reference_price + level * self._absolute_spread
+                    else:
+                        price = sell_reference_price * (Decimal("1") + self._ask_spread + (level * self._order_level_spread))
                     price = market.c_quantize_order_price(self.trading_pair, price)
                     size = self._order_amount + (self._order_level_amount * level)
                     size = market.c_quantize_order_amount(self.trading_pair, size)
