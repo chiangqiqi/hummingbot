@@ -806,9 +806,10 @@ cdef class PureMarketMakingStrategy(StrategyBase):
                             sells.append(PriceSize(price, size))
         else:
             if not buy_reference_price.is_nan():
+                _absolute_spread = True
                 for level in range(0, self._buy_levels):
-                    if self._absolute_spread:
-                        price = buy_reference_price - level * self._absolute_spread
+                    if _absolute_spread:
+                        price = buy_reference_price - level * self._minimum_spread
                     else:
                         price = buy_reference_price * (Decimal("1") - self._bid_spread - (level * self._order_level_spread))
                     price = market.c_quantize_order_price(self.trading_pair, price)
@@ -818,8 +819,8 @@ cdef class PureMarketMakingStrategy(StrategyBase):
                         buys.append(PriceSize(price, size))
             if not sell_reference_price.is_nan():
                 for level in range(0, self._sell_levels):
-                    if self._absolute_spread:
-                        price = sell_reference_price + level * self._absolute_spread
+                    if _absolute_spread:
+                        price = sell_reference_price + level * self._minimum_spread
                     else:
                         price = sell_reference_price * (Decimal("1") + self._ask_spread + (level * self._order_level_spread))
                     price = market.c_quantize_order_price(self.trading_pair, price)
