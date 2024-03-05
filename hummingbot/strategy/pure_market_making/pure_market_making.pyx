@@ -1002,7 +1002,7 @@ cdef class PureMarketMakingStrategy(StrategyBase):
                 top_bid_price
             )
             # Get the price above the top bid
-            price_above_bid = (ceil(top_bid_price / price_quantum) + 1) * price_quantum
+            price_above_bid = (ceil(top_bid_price / price_quantum) + 0) * price_quantum
 
             # If the price_above_bid is lower than the price suggested by the top pricing proposal,
             # lower the price and from there apply the order_level_spread to each order in the next levels
@@ -1025,7 +1025,7 @@ cdef class PureMarketMakingStrategy(StrategyBase):
                 top_ask_price
             )
             # Get the price below the top ask
-            price_below_ask = (floor(top_ask_price / price_quantum) - 1) * price_quantum
+            price_below_ask = (floor(top_ask_price / price_quantum) - 0) * price_quantum
 
             # If the price_below_ask is higher than the price suggested by the pricing proposal,
             # increase your price and from there apply the order_level_spread to each order in the next levels
@@ -1203,11 +1203,27 @@ cdef class PureMarketMakingStrategy(StrategyBase):
 
             active_buy_prices = [Decimal(str(o.price)) for o in active_orders if o.is_buy]
             active_sell_prices = [Decimal(str(o.price)) for o in active_orders if not o.is_buy]
-            proposal_buys = [buy.price for buy in proposal.buys]
-            proposal_sells = [sell.price for sell in proposal.sells]
+            proposal_buys = dict([(buy.price, buy) for buy in proposal.buys])
+            proposal_sells = dict([(sell.price, sell) for sell in proposal.sells])
 
-            if self.c_is_within_tolerance(active_buy_prices, proposal_buys) and \
-                    self.c_is_within_tolerance(active_sell_prices, proposal_sells):
+            # cancel some orders where price
+
+            cancel_orders = []
+            for o in active_orders:
+                if o.is_buy:
+                    if o.price in proposal_buys and o.quantity <= proposal_buys[o.price].size:
+                        # do not cancel orders
+                        proposal_buys[o.price].size = proposal_buys[o.price].size - o.quantity
+                    else:
+                        cancel_orders.append(o.client_order_id)
+                else:
+                    if o.price in proposal_sells and o.quantity <= proposal_sells[o.price].size:
+                        # cancel_orders.append(o)
+                        proposal_sells[o.price].size = proposal_sells[o.price].size - o.quantity
+                    else:
+                        cancel_orders.append(o.client_order_id)
+
+            if len(cancel_orders) == 0:
                 to_defer_canceling = True
 
         if not to_defer_canceling:
@@ -1215,7 +1231,9 @@ cdef class PureMarketMakingStrategy(StrategyBase):
             for order in self.active_non_hanging_orders:
                 # If is about to be added to hanging_orders then don't cancel
                 if not self._hanging_orders_tracker.is_potential_hanging_order(order):
-                    self.c_cancel_order(self._market_info, order.client_order_id)
+                    if order.client_order_id in cancel_orders:
+                        self.c_cancel_order(self._market_info, order.client_order_id)
+
         # else:
         #     self.set_timers()
 
