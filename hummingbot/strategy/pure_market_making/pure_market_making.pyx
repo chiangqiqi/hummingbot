@@ -1206,6 +1206,8 @@ cdef class PureMarketMakingStrategy(StrategyBase):
             bint to_defer_canceling = False
         if len(active_orders) == 0:
             return
+
+        cancel_orders = []
         if proposal is not None and \
                 self._order_refresh_tolerance_pct >= 0:
 
@@ -1216,7 +1218,6 @@ cdef class PureMarketMakingStrategy(StrategyBase):
 
             # cancel some orders where price
 
-            cancel_orders = []
             for o in active_orders:
                 if o.is_buy:
                     if o.price in proposal_buys and o.quantity <= proposal_buys[o.price].size:
